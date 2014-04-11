@@ -1,0 +1,163 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=7" />
+        <!--The viewport meta tag is used to improve the presentation and behavior of the samples on iOS devices-->
+        <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
+        <title>HERE Maps Layer for ArcGIS JavaScript API</title>
+        <link rel="stylesheet" type="text/css" href="http://serverapi.arcgisonline.com/jsapi/arcgis/2.6/js/dojo/dijit/themes/claro/claro.css">
+        <style>
+            html, body {
+                height: 100%;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+        </style>
+        <script type="text/javascript">
+            var dojoConfig = { parseOnLoad: true };
+        </script>
+        <script type="text/javascript" src="http://serverapi.arcgisonline.com/jsapi/arcgis/?v=2.6"></script>
+        <script type="text/javascript" src="../src/HERETiledMapServiceLayer.js"></script>
+        <script type="text/javascript">
+            dojo.require("esri.map");
+            dojo.require("dijit.form.Button");
+            dojo.require("dijit.layout.BorderContainer");
+            dojo.require("dijit.layout.ContentPane");
+
+            var nokiamapslayer,
+                NokiaMapsLayer;
+
+            NokiaMapsLayer = function () {
+                'use strict';
+
+                var settings = {
+                        //optional
+                        //id: 'NokiaMaps',
+
+                        //baseMapTypeName: 'SATELLITE',
+                        //componentsNames: ['Behavior', 'ZoomBar'],
+                        //visible: false,
+                        //APIURL: 'api.maps.nlp.nokia.com/2.5.1/jsl.js',
+                        //APIURL: 'js.cit.api.here.com/ee/2.5.4/jsl.js',
+
+                        //required
+                        //the app settings can be obtained at https://developer.here.com/myapps and are issued under one's Nokia account,
+                        //hence I dont' hardcode them here; instead providing them in the query string
+                        app_id: null,
+                        app_code: null
+                    },
+                    that = this,
+                    onMapResizeTimeout;
+
+                function getSettings() {
+                    var i,
+                        params = window.location.search.substring(1).split('&'),
+                        param;
+
+                    for (i = 0; i < params.length; i += 1) {
+                        param = params[i].split("=");
+
+                        if (settings[param[0]] === undefined || !settings[param[0]]) {
+                            settings[param[0]] = param[1];
+                        }
+                    }
+
+                    return settings;
+                }
+
+                function setBaseMapTypeControls(map) {
+                    var buttonsdiv = document.createElement('div');
+
+                    buttonsdiv.style.position = 'absolute';
+                    buttonsdiv.style.zIndex = 9999;
+                    buttonsdiv.style.top = '25px';
+                    buttonsdiv.style.right = '25px';
+                    buttonsdiv.style.margin = '0px';
+
+                    buttonsdiv.innerHTML = '';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="NORMAL" onclick="nokiamapslayer.setBaseMapType(\'NORMAL\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="REDUCED COLOR MAP" onclick="nokiamapslayer.setBaseMapType(\'SMARTMAP\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="SATELLITE" onclick="nokiamapslayer.setBaseMapType(\'SATELLITE\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="SATELLITE WITHOUT LABELS" onclick="nokiamapslayer.setBaseMapType(\'SATELLITE_PLAIN\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="TERRAIN" onclick="nokiamapslayer.setBaseMapType(\'TERRAIN\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 5px;"><input dojoType="dijit.form.Button" type="button" value="PUBLIC TRANSPORT" onclick="nokiamapslayer.setBaseMapType(\'SMART_PT\');"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 25px 5px 5px 5px;"><input id="button_ESRI_World_Imagery_off" dojoType="dijit.form.Button" type="button" value="Hide ArcGIS World Imagery" onclick="nokiamapslayer.esriMap.getLayer(\'ESRI_World_Imagery\').hide(); this.style.display = \'none\'; document.getElementById(\'button_ESRI_World_Imagery_on\').style.display = \'\';"></div>';
+                    buttonsdiv.innerHTML += '<div style="margin: 25px 5px 5px 5px;"><input style="display: none;" id="button_ESRI_World_Imagery_on" dojoType="dijit.form.Button" type="button" value="Show ArcGIS World Imagery" onclick="nokiamapslayer.esriMap.getLayer(\'ESRI_World_Imagery\').show(); this.style.display = \'none\'; document.getElementById(\'button_ESRI_World_Imagery_off\').style.display = \'\';"></div>';
+
+
+                    if (map.root) {
+                        map.root.appendChild(buttonsdiv);
+                    } else {
+                        setTimeout(function () { setBaseMapTypeControls(map); }, 100);
+                    }
+                }
+
+                this.setBaseMapType = function (baseMapTypeName) {
+                    if (nokiamapslayer.esriMap) {
+                        var layer = nokiamapslayer.esriMap.getLayer(nokiamapslayer.NokiaMapsID);
+                        if (layer) {
+                            layer.setBaseMapType_NokiaMapsLayer(baseMapTypeName);
+                        }
+                    }
+                };
+
+                this.init = function () {
+                    var extent = new esri.geometry.Extent({
+                            'xmax': 37334290.77786459,
+                            'xmin': -37101921.8548996,
+                            'ymax': 19479822.82896608,
+                            'ymin': -19499392.619106017,
+                            "spatialReference": {
+                                "wkid": 102100
+                            }
+                        }),
+                        map,
+                        layer;
+
+                    map = new esri.Map("mapdiv", {
+                        extent: extent
+                    });
+
+                    that.esriMap = map;
+
+                    dojo.connect(map, 'onLoad', setBaseMapTypeControls);
+
+                    layer = new LOCAL.HERETiledMapServiceLayer(
+                        getSettings()
+                    );
+
+                    map.addLayer(layer);
+
+                    that.NokiaMapsID = layer.id;
+
+                    //a reference ESRI layer
+                    layer = new esri.layers.ArcGISTiledMapServiceLayer("http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer", {id: 'ESRI_World_Imagery', visible: true, opacity: 0.5});
+                    map.addLayer(layer);
+
+                    dojo.connect(window, 'onresize', function () {
+                        //clear any existing resize timer
+                        clearTimeout(onMapResizeTimeout);
+
+                        //create new resize timer with delay of 500 milliseconds
+                        onMapResizeTimeout = setTimeout(function () { map.resize(); }, 500);
+                    });
+                };
+            };
+
+            dojo.addOnLoad(function () {
+                'use strict';
+
+                nokiamapslayer = new NokiaMapsLayer();
+
+                nokiamapslayer.init();
+            });
+        </script>
+    </head>
+    <body class="claro">
+        <div dojotype="dijit.layout.BorderContainer" design="headline" gutters="false" style="width: 100%; height: 100%; margin: 0;">
+            <div id="mapdiv" dojotype="dijit.layout.ContentPane" region="center" style="border:1px solid #000;"></div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: HERETiledMapServiceLayer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: HERETiledMapServiceLayer.js</h1>
+
+
+
+
+
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @author lapinek
+ * @copyright (c) 2013 lapinek
+ */
+
+dojo.provide('LOCAL');
+
+/**
+ * @overview
+ * &lt;p>&lt;strong>HERE Maps layer for ArcGIS Server JavaScript API&lt;/strong>&lt;/p>
+ * &lt;p>&lt;a href="../examples/nokiamapslayer.html" target="_blank">Example&lt;/a>&lt;/p>
+ */
+
+/** Provides namespace for HERE Maps related functionality
+ * @namespace
+ * @name LOCAL
+ */
+
+/**
+ * @class This class allows for using HERE Maps in ESRI ArcGIS API for JavaScript
+ * @name HERETiledMapServiceLayer
+ * @version 0.1
+ * @param {Object} options - Options to initialize the component with
+ * @param {String} [options.id] esri.layers.Layer.id
+ * @param {String} [options.APIURL=js.cit.api.here.com/ee/2.5.4/jsl.js] HERE Maps API URL, including version
+ * @param {String} [options.baseMapTypeName=NORMAL] String representation of default nokia.maps.map.Provider baseMapType
+ * @param {Array} [options.componentsNames=[]] String array of default nokia.maps.util.OList components
+ * @param {Boolean} [options.visible=true] esri.layers.Layer.visible
+ * @param {String} options.app_id HERE Maps API credentials &lt;a href="https://developer.here.com/myapps" target="_blank">https://developer.here.com/myapps&lt;/a>
+ * @param {String} options.app_code HERE Maps API credentials &lt;a href="https://developer.here.com/myapps" target="_blank">https://developer.here.com/myapps&lt;/a>
+ * @memberof LOCAL
+*/
+
+dojo.declare("LOCAL.HERETiledMapServiceLayer", esri.layers.Layer, {
+    constructor: function (options) {
+        'use strict';
+
+        //console.log('constructor');
+
+        this.nokiamap = null;
+        this.ArcGIS_API_version = '2.6';
+
+        this.options = options || {};
+        this.options.APIURL = this.options.APIURL || 'js.cit.api.here.com/ee/2.5.4/jsl.js';
+        this.options.baseMapTypeName = this.options.baseMapTypeName || 'NORMAL';
+        this.options.componentsNames = this.options.componentsNames || [];
+        this.options.visible = (this.options.visible === undefined) ? true : this.options.visible;
+
+        //when the layer is loaded, the value becomes "true", and layer properties can be accessed
+        this.loaded = true;
+
+        //information on the tiling schema
+        this.tileInfo = new esri.layers.TileInfo({
+            rows: 256,
+            cols: 256,
+            dpi: 96,
+            origin: {
+                x: -20037508.342787,
+                y: 20037508.342787
+            },
+            spatialReference: {
+                wkid: 102100
+            },
+            lods: [{
+                level: 1,
+                resolution: 78271.5169639999,
+                scale: 295828763.795777
+            }, {
+                level: 2,
+                resolution: 39135.7584820001,
+                scale: 147914381.897889
+            }, {
+                level: 3,
+                resolution: 19567.8792409999,
+                scale: 73957190.948944
+            }, {
+                level: 4,
+                resolution: 9783.93962049996,
+                scale: 36978595.474472
+            }, {
+                level: 5,
+                resolution: 4891.96981024998,
+                scale: 18489297.737236
+            }, {
+                level: 6,
+                resolution: 2445.98490512499,
+                scale: 9244648.868618
+            }, {
+                level: 7,
+                resolution: 1222.99245256249,
+                scale: 4622324.434309
+            }, {
+                level: 8,
+                resolution: 611.49622628138,
+                scale: 2311162.217155
+            }, {
+                level: 9,
+                resolution: 305.748113140558,
+                scale: 1155581.108577
+            }, {
+                level: 10,
+                resolution: 152.874056570411,
+                scale: 577790.554289
+            }, {
+                level: 11,
+                resolution: 76.4370282850732,
+                scale: 288895.277144
+            }, {
+                level: 12,
+                resolution: 38.2185141425366,
+                scale: 144447.638572
+            }, {
+                level: 13,
+                resolution: 19.1092570712683,
+                scale: 72223.819286
+            }, {
+                level: 14,
+                resolution: 9.55462853563415,
+                scale: 36111.909643
+            }, {
+                level: 15,
+                resolution: 4.77731426794937,
+                scale: 18055.954822
+            }, {
+                level: 16,
+                resolution: 2.38865713397468,
+                scale: 9027.977411
+            }, {
+                level: 17,
+                resolution: 1.19432856685505,
+                scale: 4513.988705
+            }, {
+                level: 18,
+                resolution: 0.597164283559817,
+                scale: 2256.994353
+            }, {
+                level: 19,
+                resolution: 0.298582141647617,
+                scale: 1128.497176
+            }]
+        });
+    },
+
+    //overwriting ESRI methods: start
+    _setMap: function (map, div, index, a, b, c) {
+        'use strict';
+        //console.log('_setMap');
+
+        var d;
+
+        this.map = map;
+
+        d = this.div = dojo.create("div", null, div);
+
+        if (this.options.id) {
+            d.id = this.options.id;
+        }
+
+        dojo.style(d, {
+            position: "absolute",
+            width: map.width + 'px',
+            height: map.height + 'px'
+        });
+
+        dojo.connect(this, 'onVisibilityChange', this, this._visibilityChangeHandler);
+
+        if (this.options.visible) {
+            this.init_NokiaMapsLayer();
+        }
+
+        return d;
+    },
+
+    _unsetMap: function (map, div) {
+        'use strict';
+        //console.log('_unsetMap');
+
+        if (div) {
+            div.removeChild(this.div);
+        }
+
+        dojo.destroy(this.div);
+
+        this.map = this.div = this.nokiamap = null;
+
+        dojo.disconnect(this.onMapPan_NokiaMapsLayer);
+        dojo.disconnect(this.onMapExtentChange_NokiaMapsLayer);
+        dojo.disconnect(this.onMapResize_NokiaMapsLayer);
+    },
+
+    _visibilityChangeHandler: function (visibility) {
+        'use strict';
+        //console.log('_visibilityChangeHandler');
+
+        var that = this;
+
+        function handlemapviewchange(e) {
+            that.nokiamap.removeListener('mapviewchange', handlemapviewchange, false);
+            that.handleMapResize_NokiaMapsLayer();
+            that.handleMapExtentChange_NokiaMapsLayer();
+        }
+
+        function handlemapviewchangeend(e) {
+            that.nokiamap.removeListener('mapviewchangeend', handlemapviewchangeend, false);
+            that.handleMapResize_NokiaMapsLayer();
+            that.handleMapExtentChange_NokiaMapsLayer();
+        }
+
+        if (visibility) {
+            esri.show(this.div);
+            if (this.nokiamap) {
+                this.onMapPan_NokiaMapsLayer = this.onMapPan_NokiaMapsLayer || dojo.connect(this.map, "onPan", this, "handleMapPan_NokiaMapsLayer");
+                this.onMapExtentChange_NokiaMapsLayer = this.onMapExtentChange_NokiaMapsLayer || dojo.connect(this.map, "onExtentChange", this, "handleMapExtentChange_NokiaMapsLayer");
+                this.onMapResize_NokiaMapsLayer = this.onMapResize_NokiaMapsLayer || dojo.connect(this.map, 'onResize', this, this.handleMapResize_NokiaMapsLayer);
+
+                //both are needed in certain cases
+                this.nokiamap.addListener('mapviewchange', handlemapviewchange, false);
+                this.nokiamap.addListener('mapviewchangeend', handlemapviewchangeend, false);
+            } else {
+                this.init_NokiaMapsLayer();
+            }
+        } else {
+            if (this.div) {
+                esri.hide(this.div);
+                if (this.onMapPan_NokiaMapsLayer) {
+                    dojo.disconnect(this.onMapPan_NokiaMapsLayer);
+                    this.onMapPan_NokiaMapsLayer = null;
+                }
+                if (this.onMapExtentChange_NokiaMapsLayer) {
+                    dojo.disconnect(this.onMapExtentChange_NokiaMapsLayer);
+                    this.onMapExtentChange_NokiaMapsLayer = null;
+                }
+                if (this.onMapResize_NokiaMapsLayer) {
+                    dojo.disconnect(this.onMapResize_NokiaMapsLayer);
+                    this.onMapResize_NokiaMapsLayer = null;
+                }
+            }
+        }
+    },
+    //overwriting ESRI methods: end
+
+    init_NokiaMapsLayer: function () {
+        'use strict';
+        //console.log('init_NokiaMapsLayer');
+
+        var that,
+            i,
+            script,
+            head,
+            center,
+            components,
+            component,
+            options,
+            scriptsrc;
+
+        function onApiFeaturesLoaded() {
+            //console.log('onApiFeaturesLoaded');
+
+            this.loading = false;
+
+            function handlemapviewchange(e) {
+                that.nokiamap.removeListener('mapviewchange', handlemapviewchange, false);
+                that.handleMapResize_NokiaMapsLayer();
+                that.handleMapExtentChange_NokiaMapsLayer();
+            }
+
+            function handlemapviewchangeend(e) {
+                that.nokiamap.removeListener('mapviewchangeend', handlemapviewchangeend, false);
+                that.handleMapResize_NokiaMapsLayer();
+                that.handleMapExtentChange_NokiaMapsLayer();
+            }
+
+            if (that.options.app_id) {
+                nokia.Settings.set("app_id", that.options.app_id);
+            }
+            if (that.options.app_code) {
+                nokia.Settings.set("app_code", that.options.app_code);
+            }
+
+            center = esri.geometry.webMercatorToGeographic(that.map.extent.getCenter());
+            components = [];
+
+            for (i = 0; i &lt; that.options.componentsNames.length; i += 1) {
+                component = new nokia.maps.map.component[that.options.componentsNames[i]]();
+                components.push(component);
+            }
+
+            options = {
+                center: [center.y, center.x],
+                components: components
+            };
+
+            that.nokiamap = new nokia.maps.map.Display(that.div, options);
+
+            that.setBaseMapType_NokiaMapsLayer(that.options.baseMapTypeName);
+
+            that.onMapExtentChange_NokiaMapsLayer = dojo.connect(that.map, 'onExtentChange', that, that.handleMapExtentChange_NokiaMapsLayer);
+            that.onMapPan_NokiaMapsLayer = dojo.connect(that.map, 'onPan', that, that.handleMapPan_NokiaMapsLayer);
+            that.onMapResize_NokiaMapsLayer = dojo.connect(that.map, 'onResize', that, that.handleMapResize_NokiaMapsLayer);
+
+            that.onLoad(that);
+
+            //both are needed in certain cases
+            that.nokiamap.addListener('mapviewchange', handlemapviewchange, false);
+            that.nokiamap.addListener('mapviewchangeend', handlemapviewchangeend, false);
+        }
+
+        function onApiFeaturesError(error) {
+            var key;
+
+            for (key in error) {
+                if (error.hasOwnProperty(key)) {
+                    console.log(key + ': ' + error[key]);
+                }
+            }
+            window.alert('Cannot load HERE Maps API Features.');
+        }
+
+        function onScriptLoad() {
+            //console.log('onScriptLoad');
+
+            if (window.location.protocol === "https:") {
+                nokia.Settings.set("secureConnection", "force");
+            }
+
+            nokia.Features.load(
+                nokia.Features.getFeaturesFromMatrix(["all"]),
+                onApiFeaturesLoaded,
+                onApiFeaturesError,
+                null,
+                false
+            );
+        }
+
+        if (!this.loading) {
+            this.loading = true;
+
+            that = this;
+
+            script = document.createElement('script');
+            script.type = 'text/javascript';
+
+            scriptsrc = (window.location.protocol === 'file:') ? 'http:' : window.location.protocol;
+            scriptsrc += '//' + this.options.APIURL + '?blank=true';
+            script.src = scriptsrc;
+
+            script.onreadystatechange = function () {
+                if (this.readyState === 'complete' || this.readyState === 'loaded') {
+                    onScriptLoad();
+                }
+            };
+
+            script.onload = onScriptLoad;
+
+            head = document.getElementsByTagName("head")[0] || document.documentElement;
+            head.insertBefore(script, head.firstChild);
+        }
+    },
+
+    handleMapResize_NokiaMapsLayer: function (extent, width, height) {
+        'use strict';
+        //console.log('handleMapResize_NokiaMapsLayer');
+
+        var
+            e,
+            w,
+            h,
+            topLeftPoint,
+            bottomRightPoint,
+            topLeftLat,
+            topLeftLon,
+            bottomRightLat,
+            bottomRightLon,
+            topLeft,
+            bottomRight,
+            BoundingBox;
+
+        //seems more reliable when refers to map properties
+        e = this.map.extent;
+        w = this.map.width;
+        h = this.map.height;
+
+        dojo.style(this.div, {
+            width: w + "px",
+            height: h + "px"
+        });
+
+        //the increments below are to prevent Bounding Box from appearing bigger than the map size and forcing the API to apply next zoom out level
+        topLeftPoint = esri.geometry.webMercatorToGeographic(new esri.geometry.Point(e.xmin + 0.1, e.ymax - 0.1));
+        bottomRightPoint = esri.geometry.webMercatorToGeographic(new esri.geometry.Point(e.xmax - 0.1, e.ymin + 0.1));
+
+        topLeftLat = topLeftPoint.y;
+        topLeftLon = topLeftPoint.x;
+        bottomRightLat = bottomRightPoint.y;
+        bottomRightLon = bottomRightPoint.x;
+
+        topLeft = new nokia.maps.geo.Coordinate(topLeftLat, topLeftLon);
+        bottomRight = new nokia.maps.geo.Coordinate(bottomRightLat, bottomRightLon);
+
+        BoundingBox = new nokia.maps.geo.BoundingBox(topLeft, bottomRight);
+
+        //the second argument indicates whether to keep the map center unchanged
+        this.nokiamap.zoomTo(BoundingBox, false);
+
+        this.ZoomLevel_NokiaMapsLayer = this.nokiamap.getZoom() - this.map.getLevel();
+    },
+
+    handleMapPan_NokiaMapsLayer: function (extent, delta) {
+        'use strict';
+        //console.log('handleMapPan_NokiaMapsLayer');
+
+        var center;
+
+        center = esri.geometry.webMercatorToGeographic(extent.getCenter());
+        this.nokiamap.setCenter([center.y, center.x]);
+    },
+
+    setBaseMapType_NokiaMapsLayer: function (baseMapTypeName) {
+        'use strict';
+        //console.log('setBaseMapType_NokiaMapsLayer');
+
+        this.nokiamap.set('baseMapType', nokia.maps.map.Display[baseMapTypeName]);
+    },
+
+    handleMapExtentChange_NokiaMapsLayer: function (extent, delta, levelChange, lod) {
+        'use strict';
+        //console.log('handleMapExtentChange_NokiaMapsLayer');
+
+        var that,
+            e,
+            center;
+
+        that = this;
+
+        e = extent || this.map.extent;
+
+        if (!isNaN(that.ZoomLevel_NokiaMapsLayer)) {
+            this.nokiamap.setZoomLevel(that.map.getLevel() + that.ZoomLevel_NokiaMapsLayer);
+        }
+
+        center = esri.geometry.webMercatorToGeographic(e.getCenter());
+        this.nokiamap.setCenter([center.y, center.x]);
+    }
+});
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Index</a></h2><h3>Classes</h3><ul><li><a href="LOCAL.BasemapGallery.html">BasemapGallery</a></li><li><a href="LOCAL.HERETiledMapServiceLayer.html">HERETiledMapServiceLayer</a></li></ul><h3>Namespaces</h3><ul><li><a href="LOCAL.html">LOCAL</a></li></ul>
+</nav>
+
+<br clear="both">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-dev</a> on Sun Jun 15 2014 14:10:25 GMT-0800 (AKDT)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

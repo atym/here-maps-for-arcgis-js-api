@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: BasemapGallery.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: BasemapGallery.js</h1>
+
+
+
+
+
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @author lapinek
+ * @copyright (c) 2014 lapinek
+ */
+
+define(
+    [
+        'dojo/_base/declare',
+        'esri/dijit/BasemapGallery',
+        dojoConfig.paths.jsPath + '/HERETiledMapServiceLayer.js'
+    ],
+
+    function () {
+        'use strict';
+
+        /**
+         * @class This class allows for using Non-ArcGIS tiled services in the BasemapGallery widjet
+         * @name BasemapGallery
+         * @param {Object} options Options to initialize the component with
+         * @param {Object} options.map ArcGIS Map
+         * @param {Object} options.services Configuration for tiled services to be added to the BasemapGallery dijit
+         * @param {String} options.titlePaneID The BasemapGallery dijit title pane ID
+         * @param {String} options.basemapGalleryID The BasemapGallery dijit DOM node ID
+         * @param {String} options.defaultServiceURL URL to an ArcGIS tiled service to be added first to the map and set it up, in case there isn't one specified in services
+         * @param {Boolean} options.showArcGISBasemaps Indicates whether or not to include basemaps from ArcGIS Online
+         * @param {String} [options.bingMapsKey] Bing Maps Key if Bing Maps are included in services
+         * @memberof LOCAL
+         */
+
+        /**
+         * @overview
+         * &lt;p>&lt;strong>HERE Maps content for ArcGIS Server JavaScript API&lt;/strong>&lt;/p>
+         * &lt;p>&lt;a href="../examples/herebasemapgallery.html" target="_blank">Example&lt;/a>&lt;/p>
+         */
+
+        return dojo.declare('LOCAL.BasemapGallery', null, {
+            constructor: function (options) {
+                var services,
+                    nonArcGISServices,
+                    defaultService,
+                    defaultVisibleServiceID,
+                    basemapGalleryTitlePane,
+                    basemapGallery;
+
+                function init() {
+                    var k,
+                        service,
+                        basemapService;
+
+                    services = [];
+                    nonArcGISServices = [];
+
+                    basemapGalleryTitlePane = dijit.byId(options.titlePaneID);
+
+                    for (k = 0; k &lt; options.services.length; k += 1) {
+                        basemapService = options.services[k];
+
+                        service = {};
+
+                        switch (basemapService.type) {
+                        case 'WebTiledLayer':
+                            service.layer = new esri.dijit.BasemapLayer({
+                                url: basemapService.url,
+                                type: basemapService.type,
+                                copyright: basemapService.copyright,
+                                id: basemapService.id,
+                                subDomains: basemapService.subDomains
+                            });
+
+                            break;
+
+                        case 'ArcGISTiledMapServiceLayer':
+                            service.layer = new esri.dijit.BasemapLayer({
+                                url: basemapService.url,
+                                id: basemapService.id,
+                                copyright: basemapService.copyright
+                            });
+
+                            if (!defaultService &amp;&amp; basemapService.defaultVisible &amp;&amp; basemapService.layer) {
+                                defaultService = basemapService;
+                            }
+
+                            break;
+
+                        case 'HERETiledMapServiceLayer':
+                            service = {};
+
+                            service.layer = new LOCAL.HERETiledMapServiceLayer({
+                                id: basemapService.id,
+                                //commented out are optional
+                                //componentsNames: ['Behavior', 'ZoomBar'],
+                                //APIURL: 'api.maps.nlp.nokia.com/2.5.1/jsl.js',
+                                baseMapTypeName: basemapService.baseMapTypeName,
+                                visible: basemapService.defaultVisible,
+                                app_id: basemapService.app_id,
+                                app_code: basemapService.app_code,
+                                nonArcGISService: true
+                            });
+
+                            nonArcGISServices.push(service);
+
+                            break;
+                        }
+
+                        dojo.mixin(basemapService, service);
+
+                        services.push(basemapService);
+                    }
+
+                    if (!defaultService &amp;&amp; options.defaultServiceURL) {
+                        defaultService = {
+                            defaultVisible: false,
+                            layer: new esri.layers.ArcGISTiledMapServiceLayer(options.defaultServiceURL, {id: 'Basemaps_Gallery_defaultService_Layer', visible: false, showAttribution: false})
+                        };
+                    }
+                }
+
+                //privileged methods
+                //this should be called on the map 'load' event
+                this.selectDefaultBasemap = function () {
+                    //timeout is not really necessary if/when handled correctly in the calling template
+                    setTimeout(function () {
+                        basemapGallery.select(defaultVisibleServiceID);
+
+                        basemapGalleryTitlePane.toggle();
+                    }, 100);
+                };
+
+                //this should be called right after the map is constructed
+                this.add = function () {
+                    var i,
+                        basemapOptions,
+                        basemap,
+                        basemaps,
+                        basemapGalleryParams,
+                        service;
+
+                    if (options.map.getLevel() === 0) {
+                        options.map.setLevel(1);
+                    }
+
+                    options.map.addLayer(defaultService.layer, 0);
+
+                    basemaps = [];
+
+                    for (i = 0; i &lt; services.length; i += 1) {
+                        service = services[i];
+
+                        basemapOptions = {
+                            layers: [service.layer],
+                            id: service.id,
+                            title: service.name,
+                            thumbnailUrl: service.thumbnailUrl
+                        };
+
+                        if (service.layer.options &amp;&amp; service.layer.options.nonArcGISService) {
+                            options.map.addLayer(service.layer, 1);
+
+                            service.layer.hide();
+
+                            if (typeof service.layer.onVisibilityChange === 'function') {
+                                service.layer.onVisibilityChange(false);
+                            }
+                        }
+
+                        basemap = new esri.dijit.Basemap(basemapOptions);
+
+                        basemaps.push(basemap);
+                    }
+
+                    basemapGalleryParams = {
+                        basemaps: basemaps,
+                        map: options.map,
+                        showArcGISBasemaps: options.showArcGISBasemaps
+                    };
+
+                    if (options.bingMapsKey) {
+                        basemapGalleryParams.bingMapsKey = options.bingMapsKey;
+                    }
+
+                    basemapGallery = new esri.dijit.BasemapGallery(
+                        basemapGalleryParams,
+                        options.basemapGalleryID || 'basemapGallery'
+                    );
+
+                    //development only
+                    this.basemapGallery = basemapGallery;
+
+                    basemapGallery.on('error', function (error) {
+                        console.log('error: ', error);
+                    });
+
+                    basemapGallery.startup();
+
+                    for (i = 0; i &lt; services.length; i += 1) {
+                        service = services[i];
+
+                        if (service.defaultVisible) {
+                            defaultVisibleServiceID = service.id;
+
+                            break;
+                        }
+                    }
+
+                    basemapGallery.on('selection-change', function () {
+                        var layer2;
+
+                        function showBasemapsLayer(layer) {
+                            options.map.addLayer(defaultService.layer, 0);
+
+                            if (options.map.getLevel() === 0) {
+                                options.map.setLevel(1);
+                            }
+
+                            layer.show();
+
+                            if (typeof layer.onVisibilityChange === 'function') {
+                                layer.onVisibilityChange(true);
+                            }
+                        }
+
+                        service = basemapGallery.getSelected();
+
+                        for (i = 0; i &lt; nonArcGISServices.length; i += 1) {
+                            layer2 = nonArcGISServices[i].layer;
+
+                            if (layer2 !== service.layer) {
+                                layer2.hide();
+
+                                if (typeof layer2.onVisibilityChange === 'function') {
+                                    layer2.onVisibilityChange(false);
+                                }
+                            }
+                        }
+
+                        if (service.layers[0].options &amp;&amp; service.layers[0].options.nonArcGISService) {
+                            showBasemapsLayer(service.layers[0]);
+                        }
+
+                        basemapGalleryTitlePane.toggle();
+                    });
+                };
+
+                init();
+            },
+
+            //public methods
+            test: function (a) {
+                console.log(a);
+            }
+        });
+    }
+);</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Index</a></h2><h3>Classes</h3><ul><li><a href="LOCAL.BasemapGallery.html">BasemapGallery</a></li><li><a href="LOCAL.HERETiledMapServiceLayer.html">HERETiledMapServiceLayer</a></li></ul><h3>Namespaces</h3><ul><li><a href="LOCAL.html">LOCAL</a></li></ul>
+</nav>
+
+<br clear="both">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-dev</a> on Sun Jun 15 2014 14:10:25 GMT-0800 (AKDT)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
